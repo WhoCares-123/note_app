@@ -1,0 +1,28 @@
+// ...existing code...
+buildscript {
+    repositories {
+        // ensure core repositories are present and in this order
+        google()
+        mavenCentral()
+        // Flutter engine artifacts
+        maven {
+            url "https://storage.googleapis.com/download.flutter.io"
+        }
+        // ...existing repositories...
+    }
+    dependencies {
+        // ...existing dependencies...
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url "https://storage.googleapis.com/download.flutter.io"
+        }
+        // ...existing repositories...
+    }
+}
+// ...existing code...

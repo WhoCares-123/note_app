@@ -1,0 +1,22 @@
+name: launcher_app
+description: "Launcher that starts the real note_app located in note_app/."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # keep minimal deps for the launcher; the real app has its own pubspec in note_app/
+  note_app:
+    path: note_app
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
