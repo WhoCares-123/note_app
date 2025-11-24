@@ -11,46 +11,74 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   // removed tabs — single notes view with trash button
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<NoteProvider>();
     return Scaffold(
       appBar: AppBar(
-        title: Text('All-in-One Notes'),
+        title: _isSearching
+            ? Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: 16,
+                      fontWeight: FontWeight.normal,
+                    ),
+                    cursorColor: isDark ? Colors.white : Colors.black87,
+                    selectionControls: MaterialTextSelectionControls(),
+                    decoration: InputDecoration(
+                      hintText: 'Search notes...',
+                      hintStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    onChanged: (value) => prov.setSearchQuery(value),
+                  );
+                },
+              )
+            : Text('Note'),
         actions: [
-          IconButton(
-            icon: Icon(prov.isDark ? Icons.wb_sunny : Icons.nightlight_round),
-            onPressed: () => prov.setTheme(!prov.isDark),
-            tooltip: 'Toggle theme',
-          ),
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () => _showSettingsDialog(context),
-            tooltip: 'Settings',
-          ),
-          IconButton(
-            icon: Icon(Icons.lock),
-            onPressed: () => _showPinDialog(context),
-            tooltip: 'Set/Remove PIN',
-          ),
+          if (_isSearching)
+            IconButton(
+              icon: Icon(Icons.clear),
+              onPressed: () {
+                _searchController.clear();
+                prov.clearSearch();
+                setState(() => _isSearching = false);
+              },
+              tooltip: 'Close search',
+            )
+          else
+            IconButton(
+              icon: Icon(Icons.search),
+              onPressed: () => setState(() => _isSearching = true),
+              tooltip: 'Search',
+            ),
+          if (!_isSearching)
+            IconButton(
+              icon: Icon(Icons.settings),
+              onPressed: () => _showSettingsDialog(context),
+              tooltip: 'Settings',
+            ),
         ],
       ),
-      // main notes body with overlayed trash button
-      body: Stack(children: [
-        _buildNotesTab(context, prov),
-        Positioned(
-          bottom: 18,
-          left: 18,
-          child: FloatingActionButton.small(
-            heroTag: 'trash_btn',
-            onPressed: () => _openTrashSheet(context, prov),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            child: Icon(Icons.delete_outline),
-            tooltip: 'Trash',
-          ),
-        ),
-      ]),
+      body: _buildNotesTab(context, prov),
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add),
         onPressed: () => _showCreateChooser(context),
@@ -60,7 +88,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildNotesTab(BuildContext ctx, NoteProvider prov) {
     final list = prov.activeNotes;
-    if (list.isEmpty) return Center(child: Text('No notes yet. Tap + to create one.'));
+    if (list.isEmpty) {
+      if (prov.searchQuery.isNotEmpty) {
+        return Center(child: Text('No notes found matching "${prov.searchQuery}"'));
+      }
+      return Center(child: Text('No notes yet. Tap + to create one.'));
+    }
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: ListView.separated(
@@ -93,8 +126,43 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     title: Text(list[i].title.isEmpty ? '(No title)' : list[i].title),
                     subtitle: Text(list[i].content.isEmpty ? '' : list[i].content),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      IconButton(icon: Icon(Icons.restore), onPressed: () => prov.restoreNote(list[i].id)),
-                      IconButton(icon: Icon(Icons.delete_forever), onPressed: () => prov.deleteNote(list[i].id, permanent: true)),
+                      IconButton(
+                        icon: Icon(Icons.restore),
+                        onPressed: () {
+                          prov.restoreNote(list[i].id);
+                          Navigator.pop(ctx);
+                        },
+                        tooltip: 'Restore',
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete_forever),
+                        color: Colors.red,
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: ctx,
+                            builder: (_) => AlertDialog(
+                              title: Text('Delete Permanently?'),
+                              content: Text('This action cannot be undone. Are you sure you want to permanently delete this note?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  child: Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            prov.deleteNote(list[i].id, permanent: true);
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        tooltip: 'Delete Permanently',
+                      ),
                     ]),
                   ),
                 ),
@@ -145,6 +213,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             onChanged: (v) => prov.setTheme(v),
           ),
           SizedBox(height: 8),
+          ListTile(
+            leading: Icon(Icons.delete_outline),
+            title: Text('Trash'),
+            trailing: Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(ctx);
+              _openTrashSheet(ctx, prov);
+            },
+          ),
+          SizedBox(height: 8),
           ElevatedButton(
             onPressed: () {
               prov.emptyTrash();
@@ -155,35 +233,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Close')),
-        ],
-      ),
-    );
-  }
-
-  void _showPinDialog(BuildContext ctx) {
-    final prov = ctx.read<NoteProvider>();
-    final controller = TextEditingController();
-    showDialog(
-      context: ctx,
-      builder: (_) => AlertDialog(
-        title: Text(prov.appPin == null ? 'Set PIN' : 'Change / Remove PIN'),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(hintText: prov.appPin == null ? 'Enter PIN' : 'New PIN or leave empty to remove'),
-          obscureText: true,
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              final val = controller.text.trim();
-              if (val.isEmpty) prov.setPin(null);
-              else prov.setPin(val);
-              Navigator.pop(ctx);
-            },
-            child: Text('Save'),
-          ),
         ],
       ),
     );

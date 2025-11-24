@@ -17,9 +17,12 @@ class Note {
   List<ChecklistItem> checklist;
   DateTime? reminder; // in-app reminder
   bool locked;
+  String? notePin; // 4-digit PIN for this specific note
   int color; // store ARGB hex, default white
   bool deleted; // soft-delete flag
   DateTime? deletedAt;
+  bool pinned; // pin flag
+  DateTime? pinnedAt; // when it was pinned (for ordering)
   String type; // 'note' | 'checklist' | 'reminder'
   DateTime createdAt;
   DateTime updatedAt;
@@ -31,15 +34,17 @@ class Note {
     this.checklist = const [],
     this.reminder,
     this.locked = false,
+    this.notePin,
     this.color = 0xFFFFFFFF,
     this.deleted = false,
-    DateTime? deletedAt,
+    this.deletedAt,
+    this.pinned = false,
+    this.pinnedAt,
     this.type = 'note',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : deletedAt = deletedAt,
-        createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  })  : this.createdAt = createdAt ?? DateTime.now(),
+        this.updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -48,9 +53,12 @@ class Note {
         'checklist': checklist.map((c) => c.toMap()).toList(),
         'reminder': reminder?.toIso8601String(),
         'locked': locked,
+        'notePin': notePin,
         'color': color,
         'deleted': deleted,
         'deletedAt': deletedAt?.toIso8601String(),
+        'pinned': pinned,
+        'pinnedAt': pinnedAt?.toIso8601String(),
         'type': type,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
@@ -67,9 +75,12 @@ class Note {
         reminder:
             m['reminder'] != null ? DateTime.parse(m['reminder']) : null,
         locked: m['locked'] ?? false,
+        notePin: m['notePin'] as String?,
         color: m['color'] != null ? (m['color'] as int) : 0xFFFFFFFF,
         deleted: m['deleted'] ?? false,
         deletedAt: m['deletedAt'] != null ? DateTime.parse(m['deletedAt']) : null,
+        pinned: m['pinned'] ?? false,
+        pinnedAt: m['pinnedAt'] != null ? DateTime.parse(m['pinnedAt']) : null,
         type: m['type'] ?? 'note',
         createdAt:
             m['createdAt'] != null ? DateTime.parse(m['createdAt']) : null,

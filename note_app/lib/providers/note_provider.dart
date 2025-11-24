@@ -10,6 +10,7 @@ class NoteProvider extends ChangeNotifier {
   bool isDark = false;
   String? appPin;
   Timer? _reminderTimer;
+  String _searchQuery = '';
 
   NoteProvider() {
     _init();
@@ -109,6 +110,57 @@ class NoteProvider extends ChangeNotifier {
 
   bool validatePin(String input) => appPin != null && appPin == input;
 
-  List<Note> get activeNotes => notes.where((n) => !n.deleted).toList();
+  Future<void> togglePin(String id) async {
+    final idx = notes.indexWhere((n) => n.id == id);
+    if (idx < 0) return;
+    notes[idx].pinned = !notes[idx].pinned;
+    notes[idx].pinnedAt = notes[idx].pinned ? DateTime.now() : null;
+    await saveAll();
+    notifyListeners();
+  }
+
+  void setSearchQuery(String query) {
+    _searchQuery = query.toLowerCase().trim();
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _searchQuery = '';
+    notifyListeners();
+  }
+
+  bool _matchesSearch(Note note) {
+    if (_searchQuery.isEmpty) return true;
+    
+    final query = _searchQuery;
+    final titleMatch = note.title.toLowerCase().contains(query);
+    final contentMatch = note.content.toLowerCase().contains(query);
+    final checklistMatch = note.checklist.any((item) => 
+      item.text.toLowerCase().contains(query));
+    
+    return titleMatch || contentMatch || checklistMatch;
+  }
+
+  List<Note> get activeNotes {
+    final active = notes.where((n) => !n.deleted).toList();
+    // Sort: pinned notes first (by pinnedAt), then unpinned notes (by updatedAt)
+    active.sort((a, b) {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      if (a.pinned && b.pinned) {
+        // Both pinned: sort by pinnedAt (earlier pinned = first)
+        final aPinnedAt = a.pinnedAt ?? DateTime(0);
+        final bPinnedAt = b.pinnedAt ?? DateTime(0);
+        return aPinnedAt.compareTo(bPinnedAt);
+      }
+      // Both unpinned: sort by updatedAt (newer = first)
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+    if (_searchQuery.isEmpty) return active;
+    return active.where(_matchesSearch).toList();
+  }
+  
   List<Note> get trashNotes => notes.where((n) => n.deleted).toList();
+  
+  String get searchQuery => _searchQuery;
 }

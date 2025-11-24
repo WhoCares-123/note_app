@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/note.dart';
 import '../providers/note_provider.dart';
-import '../pages/editor_page.dart';
+import '../pages/view_page.dart';
 
 class NoteCard extends StatelessWidget {
   final Note note;
@@ -15,73 +15,127 @@ class NoteCard extends StatelessWidget {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: InkWell(
-        onTap: () async {
-          if (note.locked) {
-            final ok = await _askPin(context, prov);
-            if (!ok) return;
-          }
-          final mode = note.checklist.isNotEmpty ? NoteMode.checklist : NoteMode.note;
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => EditorPage(note: note, mode: mode)));
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // color marker
-              Container(width: 12, height: 56, decoration: BoxDecoration(color: Color(note.color), borderRadius: BorderRadius.circular(6))),
-              SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(note.title.isEmpty ? '(No title)' : note.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  SizedBox(height: 6),
-                  // prefer showing checklist preview when there are checklist items
-                  Text(note.checklist.isNotEmpty ? _snippetFromChecklist(note) : _snippetFromContent(note), style: TextStyle(color: Colors.grey[600])),
-                  SizedBox(height: 8),
-                  Row(children: [
-                    if (note.checklist.isNotEmpty) Icon(Icons.check_box, size: 18, color: Colors.green),
-                    SizedBox(width: 8),
-                    if (note.reminder != null)
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: () async {
+              if (note.notePin != null) {
+                final ok = await _askPin(context, prov);
+                if (!ok) return;
+              }
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => ViewPage(note: note)));
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // color marker
+                  Container(width: 12, height: 56, decoration: BoxDecoration(color: Color(note.color), borderRadius: BorderRadius.circular(6))),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(note.title.isEmpty ? '(No title)' : note.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      SizedBox(height: 6),
+                      // prefer showing checklist preview when there are checklist items
+                      Text(note.checklist.isNotEmpty ? _snippetFromChecklist(note) : _snippetFromContent(note), style: TextStyle(color: Colors.grey[600])),
+                      SizedBox(height: 8),
                       Row(children: [
-                        Icon(Icons.alarm, size: 18, color: Colors.orange),
-                        SizedBox(width: 6),
-                        Text(_formatTime(note.reminder!))
-                      ]),
-                  ])
-                ]),
+                        if (note.checklist.isNotEmpty) Icon(Icons.check_box, size: 18, color: Colors.green),
+                        SizedBox(width: 8),
+                        if (note.reminder != null)
+                          Row(children: [
+                            Icon(Icons.alarm, size: 18, color: Colors.orange),
+                            SizedBox(width: 6),
+                            Text(_formatTime(note.reminder!))
+                          ]),
+                      ])
+                    ]),
+                  ),
+                  SizedBox(width: 8),
+                  // actions popup (single Edit based on note.type)
+                  PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(),
+                    iconSize: 20,
+                    onSelected: (v) async {
+                      if (v == 'edit') {
+                        // open view page which has edit button
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => ViewPage(note: note)));
+                      } else if (v == 'color') {
+                        await _pickColor(context, prov);
+                      } else if (v == 'pin') {
+                        await prov.togglePin(note.id);
+                      } else if (v == 'trash') {
+                        await prov.deleteNote(note.id);
+                      } else if (v == 'restore') {
+                        await prov.restoreNote(note.id);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(value: 'color', child: Text('Change color')),
+                      if (!note.deleted)
+                        PopupMenuItem(
+                          value: 'pin',
+                          child: Row(
+                            children: [
+                              Icon(note.pinned ? Icons.push_pin : Icons.push_pin_outlined, size: 20),
+                              SizedBox(width: 8),
+                              Text(note.pinned ? 'Unpin' : 'Pin'),
+                            ],
+                          ),
+                        ),
+                      if (!note.deleted) PopupMenuItem(value: 'trash', child: Text('Move to Trash')),
+                      if (note.deleted) PopupMenuItem(value: 'restore', child: Text('Restore')),
+                    ],
+                  ),
+                  SizedBox(width: 8),
+                ],
               ),
-              Column(children: [
-                // actions popup (single Edit based on note.type)
-                PopupMenuButton<String>(
-                  onSelected: (v) async {
-                    if (v == 'edit') {
-                      // open editor in note's stored type
-                      final mode = (note.type == 'checklist') ? NoteMode.checklist : (note.type == 'reminder') ? NoteMode.reminder : NoteMode.note;
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => EditorPage(note: note, mode: mode)));
-                    } else if (v == 'color') {
-                      await _pickColor(context, prov);
-                    } else if (v == 'trash') {
-                      await prov.deleteNote(note.id);
-                    } else if (v == 'delete') {
-                      await prov.deleteNote(note.id, permanent: true);
-                    } else if (v == 'restore') {
-                      await prov.restoreNote(note.id);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    PopupMenuItem(value: 'color', child: Text('Change color')),
-                    if (!note.deleted) PopupMenuItem(value: 'trash', child: Text('Move to Trash')),
-                    if (note.deleted) PopupMenuItem(value: 'restore', child: Text('Restore')),
-                    PopupMenuItem(value: 'delete', child: Text('Delete permanently')),
-                  ],
-                ),
-                if (note.locked) Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.lock, color: Colors.redAccent))
-              ])
-            ],
+            ),
           ),
-        ),
+          // Pin indicator icon at top right edge of the card
+          if (note.pinned)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                width: 24,
+                height: 24,
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.amber,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.push_pin,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          // Lock indicator icon at bottom right edge of the card
+          if (note.notePin != null)
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                width: 24,
+                height: 24,
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.lock,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -103,13 +157,26 @@ class NoteCard extends StatelessWidget {
       context: ctx,
       builder: (_) => AlertDialog(
         title: Text('Locked'),
-        content: TextField(controller: ctrl, obscureText: true, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Enter PIN')),
+        content: TextField(
+          controller: ctrl,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          maxLength: 4,
+          decoration: InputDecoration(hintText: 'Enter 4-digit PIN'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
-          TextButton(onPressed: () {
-            final ok = prov.validatePin(ctrl.text.trim());
-            Navigator.pop(ctx, ok);
-          }, child: Text('Unlock')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final enteredPin = ctrl.text.trim();
+              final ok = note.notePin != null && note.notePin == enteredPin;
+              Navigator.pop(ctx, ok);
+            },
+            child: Text('Unlock'),
+          ),
         ],
       ),
     );
