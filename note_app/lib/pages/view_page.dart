@@ -38,14 +38,16 @@ class _ViewPageState extends State<ViewPage> {
       appBar: AppBar(
         title: Text('Note'),
         actions: [
-          IconButton(
-            icon: Icon(
-              currentNote.notePin != null ? Icons.lock : Icons.lock_open,
-              color: currentNote.notePin != null ? Colors.redAccent : null,
+          // Only show lock button if note is not deleted
+          if (!currentNote.deleted)
+            IconButton(
+              icon: Icon(
+                currentNote.notePin != null ? Icons.lock : Icons.lock_open,
+                color: currentNote.notePin != null ? Colors.redAccent : null,
+              ),
+              onPressed: () => _toggleNoteLock(context, prov),
+              tooltip: currentNote.notePin != null ? 'Unlock note' : 'Lock note',
             ),
-            onPressed: () => _toggleNoteLock(context, prov),
-            tooltip: currentNote.notePin != null ? 'Unlock note' : 'Lock note',
-          ),
         ],
       ),
       body: Stack(
@@ -55,40 +57,42 @@ class _ViewPageState extends State<ViewPage> {
               _buildNoteView(currentNote),
             ],
           ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () async {
-                // Note: No PIN check needed here since user is already in view page
-                // For checklists, use EditorPage; for regular notes, use SimpleEditPage
-                if (currentNote.checklist.isNotEmpty || currentNote.type == 'checklist') {
-                  // Use EditorPage for checklists to preserve checklist functionality
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EditorPage(note: currentNote, mode: NoteMode.checklist),
-                    ),
-                  );
-                  setState(() {}); // Refresh after editing
-                } else {
-                  // Use SimpleEditPage for regular notes
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SimpleEditPage(note: currentNote),
-                    ),
-                  );
-                  if (result == true) {
-                    // Refresh the note after editing
-                    setState(() {});
+          // Only show edit button if note is not deleted
+          if (!currentNote.deleted)
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: FloatingActionButton(
+                onPressed: () async {
+                  // Note: No PIN check needed here since user is already in view page
+                  // For checklists, use EditorPage; for regular notes, use SimpleEditPage
+                  if (currentNote.checklist.isNotEmpty || currentNote.type == 'checklist') {
+                    // Use EditorPage for checklists to preserve checklist functionality
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditorPage(note: currentNote, mode: NoteMode.checklist),
+                      ),
+                    );
+                    setState(() {}); // Refresh after editing
+                  } else {
+                    // Use SimpleEditPage for regular notes
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SimpleEditPage(note: currentNote),
+                      ),
+                    );
+                    if (result == true) {
+                      // Refresh the note after editing
+                      setState(() {});
+                    }
                   }
-                }
-              },
-              child: Icon(Icons.edit),
-              tooltip: 'Edit',
+                },
+                child: Icon(Icons.edit),
+                tooltip: 'Edit',
+              ),
             ),
-          ),
         ],
       ),
     );

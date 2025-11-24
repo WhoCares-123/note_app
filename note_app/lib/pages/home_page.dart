@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/note_provider.dart';
 import '../widgets/note_card.dart';
+import '../widgets/trash_note_card.dart';
 import '../pages/editor_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -115,55 +116,32 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           child: Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Trash', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), TextButton(onPressed: () { prov.emptyTrash(); Navigator.pop(ctx); }, child: Text('Empty'))]),
-              if (list.isEmpty) Padding(padding: const EdgeInsets.all(24.0), child: Text('Trash is empty.')),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Trash', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  TextButton(
+                    onPressed: () {
+                      prov.emptyTrash();
+                      Navigator.pop(ctx);
+                    },
+                    child: Text('Empty'),
+                  ),
+                ],
+              ),
+              if (list.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text('Trash is empty.'),
+                ),
               Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => SizedBox(height: 8),
-                  itemBuilder: (_, i) => ListTile(
-                    title: Text(list[i].title.isEmpty ? '(No title)' : list[i].title),
-                    subtitle: Text(list[i].content.isEmpty ? '' : list[i].content),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      IconButton(
-                        icon: Icon(Icons.restore),
-                        onPressed: () {
-                          prov.restoreNote(list[i].id);
-                          Navigator.pop(ctx);
-                        },
-                        tooltip: 'Restore',
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete_forever),
-                        color: Colors.red,
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: ctx,
-                            builder: (_) => AlertDialog(
-                              title: Text('Delete Permanently?'),
-                              content: Text('This action cannot be undone. Are you sure you want to permanently delete this note?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                  child: Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            prov.deleteNote(list[i].id, permanent: true);
-                            Navigator.pop(ctx);
-                          }
-                        },
-                        tooltip: 'Delete Permanently',
-                      ),
-                    ]),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => SizedBox(height: 8),
+                    itemBuilder: (_, i) => TrashNoteCard(note: list[i]),
                   ),
                 ),
               ),
